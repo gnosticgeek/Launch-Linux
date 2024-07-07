@@ -1,107 +1,197 @@
 ---
 - name: Install Modern Unix Tools
   hosts: localhost
-  become: yes
+  connection: local
+  gather_facts: true
+
   vars:
+    # User and path variables
     homebrew_user: "{{ ansible_env.USER }}"
     homebrew_group: "{{ ansible_env.USER }}"
     homebrew_prefix: "/home/linuxbrew/.linuxbrew"
     homebrew_install_path: "/home/{{ homebrew_user }}/.linuxbrew"
 
+    # Packages to be installed
+    apt_packages:
+      - git
+      - curl
+      - wget
+      - tmux
+      - htop
+      - python3-pip
+    homebrew_packages:
+      - bat
+      - eza
+      - ripgrep
+      - fd
+      - duf
+      - broot
+      - fzf
+      - mcfly
+      - zoxide
+      - bottom
+      - procs
+      - hyperfine
+      - gping
+      - dog
+      - git-delta
+      - dust
+      - neovim
+
+    # Logging variables
+    log_file: "/tmp/modern_unix_tools_install.log"
+
   tasks:
+    # Update apt cache
     - name: Update apt cache
+      become: true
       apt:
         update_cache: yes
         cache_valid_time: 3600
+      register: apt_update_result
 
+    # Log apt update result
+    - name: Log apt update result
+      copy:
+        content: "Apt cache update: {{ 'Success' if apt_update_result.changed else 'No update needed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Install essential apt packages
     - name: Install essential apt packages
+      become: true
       apt:
-        name:
-          - git
-          - curl
-          - wget
-          - tmux
-          - htop
-          - python3-pip
+        name: "{{ apt_packages }}"
         state: present
+      register: apt_install_result
 
+    # Log apt install result
+    - name: Log apt install result
+      copy:
+        content: "Apt packages installation: {{ 'Success' if apt_install_result.changed else 'No changes required' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Display apt install result
+    - name: Display apt install result
+      debug:
+        msg: "Apt packages installation: {{ 'Success' if apt_install_result.changed else 'No changes required' }}"
+
+    # Install tldr using pip
     - name: Install tldr using pip
+      become: true
       pip:
         name: tldr
         state: latest
-      become: yes
+      register: tldr_install_result
 
+    # Log tldr install result
+    - name: Log tldr install result
+      copy:
+        content: "TLDR installation: {{ 'Success' if tldr_install_result.changed else 'Already installed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Check if Homebrew is installed
     - name: Check if Homebrew is installed
       stat:
         path: "{{ homebrew_prefix }}/bin/brew"
       register: homebrew_check
 
-    - name: Download Homebrew installation script
-      get_url:
-        url: https://raw.githubusercontent.com/Homebrew/install/master/install.sh
-        dest: /tmp/homebrew_install.sh
-        mode: '0755'
-      when: not homebrew_check.stat.exists
-
+    # Install Homebrew if not already installed
     - name: Install Homebrew
-      command: /bin/bash /tmp/homebrew_install.sh
+      when: not homebrew_check.stat.exists
+      block:
+        - name: Run Homebrew installation script
+          shell: /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          args:
+            creates: "{{ homebrew_prefix }}/bin/brew"
+          become: false
+          register: homebrew_install_result
+
+        - name: Add Homebrew to PATH
+          lineinfile:
+            path: "/home/{{ homebrew_user }}/.profile"
+            line: 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+            create: yes
+
+        # Log Homebrew install result
+        - name: Log Homebrew install result
+          copy:
+            content: "Homebrew installation: {{ 'Success' if homebrew_install_result.changed else 'Already installed' }}\n"
+            dest: "{{ log_file }}"
+            mode: "a"
+
+    # Unlink 'choose' package if installed (to avoid conflicts with choose-rust)
+    - name: Unlink choose if installed
+      command: brew unlink choose
+      ignore_errors: yes
+      become: false
       become_user: "{{ homebrew_user }}"
-      when: not homebrew_check.stat.exists
+      environment:
+        PATH: "{{ homebrew_prefix }}/bin:{{ ansible_env.PATH }}"
+      register: unlink_choose_result
 
-    - name: Add Homebrew to PATH
-      lineinfile:
-        path: "/home/{{ homebrew_user }}/.profile"
-        line: 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
-        create: yes
-      when: not homebrew_check.stat.exists
+    # Log 'choose' unlink result
+    - name: Log choose unlink result
+      copy:
+        content: "Unlink 'choose': {{ 'Success' if unlink_choose_result.changed else 'Not needed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
 
+    # Install Homebrew packages
     - name: Install Homebrew packages
       community.general.homebrew:
-        name:
-          - bat  # cat alternative
-          - exa  # ls alternative
-          - ripgrep  # grep alternative
-          - fd  # find alternative
-          - duf  # df alternative
-          - broot  # file manager and navigator
-          - fzf  # fuzzy finder
-          - mcfly  # bash history search
-          - choose  # cut/awk alternative
-          - zoxide  # smarter cd command
-          - bottom  # top alternative
-          - procs  # ps alternative
-          - hyperfine  # benchmarking tool
-          - gping  # ping alternative with graph
-          - dog  # dig alternative
-          - delta  # diff tool
-          - dust  # du alternative
-          - neovim  # vim alternative
+        name: "{{ item }}"
         state: present
-      become: no
+      loop: "{{ homebrew_packages }}"
+      become: false
       become_user: "{{ homebrew_user }}"
+      environment:
+        PATH: "{{ homebrew_prefix }}/bin:{{ ansible_env.PATH }}"
+      register: brew_result
+      ignore_errors: yes
 
-    - name: Set up fzf
-      command: "{{ homebrew_prefix }}/opt/fzf/install --all"
-      become: no
+    # Install choose-rust separately
+    - name: Install choose-rust
+      community.general.homebrew:
+        name: choose-rust
+        state: present
+      become: false
       become_user: "{{ homebrew_user }}"
-      args:
-        creates: "/home/{{ homebrew_user }}/.fzf.bash"
+      environment:
+        PATH: "{{ homebrew_prefix }}/bin:{{ ansible_env.PATH }}"
+      register: choose_rust_result
+      ignore_errors: yes
 
-    - name: Set up broot
-      command: broot --install
-      become: no
-      become_user: "{{ homebrew_user }}"
-      args:
-        creates: "/home/{{ homebrew_user }}/.config/broot/launcher/bash/br"
+    # Log Homebrew packages installation results
+    - name: Log Homebrew packages installation results
+      copy:
+        content: |
+          Homebrew packages installation:
+          {% for item in brew_result.results %}
+          {{ item.item }}: {{ 'Success' if not item.failed else 'Failed' }}
+          {% endfor %}
+          choose-rust: {{ 'Success' if not choose_rust_result.failed else 'Failed' }}
+        dest: "{{ log_file }}"
+        mode: "a"
 
-    - name: Ensure .bashrc exists
-      file:
-        path: "/home/{{ homebrew_user }}/.bashrc"
-        state: touch
-        owner: "{{ homebrew_user }}"
-        group: "{{ homebrew_group }}"
-        mode: '0644'
+    # Display summary of installations
+    - name: Display installation summary
+      debug:
+        msg: |
+          Installation Summary:
+          {% for item in brew_result.results %}
+          {{ item.item }}: {{ 'OK' if not item.failed else 'Failed' }}
+          {% endfor %}
+          choose-rust: {{ 'OK' if not choose_rust_result.failed else 'Failed' }}
 
+    # Notify user about log file
+    - name: Notify user about log file
+      debug:
+        msg: "Detailed installation log can be found at {{ log_file }}"
+
+    # Add tool configurations to .bashrc
     - name: Add tool configurations to .bashrc
       blockinfile:
         path: "/home/{{ homebrew_user }}/.bashrc"
@@ -120,22 +210,19 @@
 
           # Aliases
           alias cat="bat"
-          alias ls="exa"
-          alias l="exa -l"
-          alias la="exa -la"
-          alias tree="exa --tree"
+          alias ls="eza"
+          alias l="eza -l"
+          alias la="eza -la"
+          alias tree="eza --tree"
           alias find="fd"
           alias top="btm"
           alias du="dust"
           alias dig="dog"
           alias cd="z"
+          alias diff="delta"
         marker: "# {mark} ANSIBLE MANAGED BLOCK - Modern Unix tools configuration"
 
-    - name: Update tldr cache
-      command: tldr --update
-      become: no
-      become_user: "{{ homebrew_user }}"
-
-    - name: Inform user to restart shell or source .bashrc
+    # Final reminder to user
+    - name: Remind user to restart shell
       debug:
-        msg: "Please restart your shell or run 'source ~/.bashrc' to apply changes."
+        msg: "Remember to restart your shell or run 'source ~/.bashrc' to apply changes."
