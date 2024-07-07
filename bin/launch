@@ -1,0 +1,5 @@
+#!/bin/bash
+
+echo "Welcome to Launch!"
+echo "This script will guide you through setting up your Linux system."
+# Add more functionality here

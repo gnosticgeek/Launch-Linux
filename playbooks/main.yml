@@ -1,0 +1,8 @@
+---
+- name: Main Launch playbook
+  hosts: localhost
+  connection: local
+  become: yes
+
+  roles:
+    # Add roles here
