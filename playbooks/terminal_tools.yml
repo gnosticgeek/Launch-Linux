@@ -1,0 +1,141 @@
+---
+- name: Install Modern Unix Tools
+  hosts: localhost
+  become: yes
+  vars:
+    homebrew_user: "{{ ansible_env.USER }}"
+    homebrew_group: "{{ ansible_env.USER }}"
+    homebrew_prefix: "/home/linuxbrew/.linuxbrew"
+    homebrew_install_path: "/home/{{ homebrew_user }}/.linuxbrew"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install essential apt packages
+      apt:
+        name:
+          - git
+          - curl
+          - wget
+          - tmux
+          - htop
+          - python3-pip
+        state: present
+
+    - name: Install tldr using pip
+      pip:
+        name: tldr
+        state: latest
+      become: yes
+
+    - name: Check if Homebrew is installed
+      stat:
+        path: "{{ homebrew_prefix }}/bin/brew"
+      register: homebrew_check
+
+    - name: Download Homebrew installation script
+      get_url:
+        url: https://raw.githubusercontent.com/Homebrew/install/master/install.sh
+        dest: /tmp/homebrew_install.sh
+        mode: '0755'
+      when: not homebrew_check.stat.exists
+
+    - name: Install Homebrew
+      command: /bin/bash /tmp/homebrew_install.sh
+      become_user: "{{ homebrew_user }}"
+      when: not homebrew_check.stat.exists
+
+    - name: Add Homebrew to PATH
+      lineinfile:
+        path: "/home/{{ homebrew_user }}/.profile"
+        line: 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'
+        create: yes
+      when: not homebrew_check.stat.exists
+
+    - name: Install Homebrew packages
+      community.general.homebrew:
+        name:
+          - bat  # cat alternative
+          - exa  # ls alternative
+          - ripgrep  # grep alternative
+          - fd  # find alternative
+          - duf  # df alternative
+          - broot  # file manager and navigator
+          - fzf  # fuzzy finder
+          - mcfly  # bash history search
+          - choose  # cut/awk alternative
+          - zoxide  # smarter cd command
+          - bottom  # top alternative
+          - procs  # ps alternative
+          - hyperfine  # benchmarking tool
+          - gping  # ping alternative with graph
+          - dog  # dig alternative
+          - delta  # diff tool
+          - dust  # du alternative
+          - neovim  # vim alternative
+        state: present
+      become: no
+      become_user: "{{ homebrew_user }}"
+
+    - name: Set up fzf
+      command: "{{ homebrew_prefix }}/opt/fzf/install --all"
+      become: no
+      become_user: "{{ homebrew_user }}"
+      args:
+        creates: "/home/{{ homebrew_user }}/.fzf.bash"
+
+    - name: Set up broot
+      command: broot --install
+      become: no
+      become_user: "{{ homebrew_user }}"
+      args:
+        creates: "/home/{{ homebrew_user }}/.config/broot/launcher/bash/br"
+
+    - name: Ensure .bashrc exists
+      file:
+        path: "/home/{{ homebrew_user }}/.bashrc"
+        state: touch
+        owner: "{{ homebrew_user }}"
+        group: "{{ homebrew_group }}"
+        mode: '0644'
+
+    - name: Add tool configurations to .bashrc
+      blockinfile:
+        path: "/home/{{ homebrew_user }}/.bashrc"
+        block: |
+          # FZF
+          [ -f ~/.fzf.bash ] && source ~/.fzf.bash
+
+          # Broot
+          source /home/{{ homebrew_user }}/.config/broot/launcher/bash/br
+
+          # Zoxide
+          eval "$(zoxide init bash)"
+
+          # McFly
+          eval "$(mcfly init bash)"
+
+          # Aliases
+          alias cat="bat"
+          alias ls="exa"
+          alias l="exa -l"
+          alias la="exa -la"
+          alias tree="exa --tree"
+          alias find="fd"
+          alias top="btm"
+          alias du="dust"
+          alias dig="dog"
+          alias cd="z"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - Modern Unix tools configuration"
+
+    - name: Update tldr cache
+      command: tldr --update
+      become: no
+      become_user: "{{ homebrew_user }}"
+
+    - name: Inform user to restart shell or source .bashrc
+      debug:
+        msg: "Please restart your shell or run 'source ~/.bashrc' to apply changes."
