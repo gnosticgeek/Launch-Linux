@@ -1,5 +1,84 @@
 #!/bin/bash
 
-echo "Welcome to Launch!"
-echo "This script will guide you through setting up your Linux system."
-# Add more functionality here
+# Exit immediately if a command exits with a non-zero status
+set -e
+
+# Function to check if a command exists
+command_exists() {
+    command -v "$1" >/dev/null 2>&1
+}
+
+# Function to install a package
+install_package() {
+    if ! command_exists "$1"; then
+        echo "Installing $1..."
+        sudo apt-get install -y "$1"
+    else
+        echo "$1 is already installed."
+    fi
+}
+
+# Function to display the menu
+display_menu() {
+    clear
+    echo "===== Launch Menu ====="
+    echo "1. Update system"
+    echo "2. Install essential software"
+    echo "3. Optimize system settings"
+    echo "4. View documentation"
+    echo "5. Exit"
+    echo "======================="
+}
+
+# Function to handle menu choices
+handle_choice() {
+    case $1 in
+        1) echo "Updating system..." ;;
+        2) echo "Installing essential software..." ;;
+        3) echo "Optimizing system settings..." ;;
+        4) less "$REPO_DIR/docs/user_guide.md" ;;
+        5) echo "Exiting..."; exit 0 ;;
+        *) echo "Invalid option. Please try again." ;;
+    esac
+    read -p "Press enter to continue..."
+}
+
+# Main script starts here
+
+# Clone or update the repository
+REPO_URL="https://github.com/gnosticgeek/Launch-Linux.git"
+REPO_DIR="$HOME/Launch-Linux"
+
+if [ -d "$REPO_DIR" ]; then
+    echo "Repository already exists. Updating..."
+    cd "$REPO_DIR"
+    git pull
+else
+    echo "Cloning repository..."
+    git clone "$REPO_URL" "$REPO_DIR"
+    cd "$REPO_DIR"
+fi
+
+# Source the ASCII art file
+if [ -f "$REPO_DIR/lib/ascii.sh" ]; then
+    source "$REPO_DIR/lib/ascii.sh"
+else
+    echo "ASCII art file not found. Continuing without display."
+fi
+
+# Update package lists
+echo "Updating package lists..."
+sudo apt-get update
+
+# Install dependencies
+echo "Installing dependencies..."
+install_package "git"
+install_package "ansible"
+install_package "curl"
+
+# Main menu loop
+while true; do
+    display_menu
+    read -p "Enter your choice: " choice
+    handle_choice "$choice"
+done
