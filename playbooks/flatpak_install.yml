@@ -1,0 +1,144 @@
+---
+- name: Install and Manage Flatpak Apps
+  hosts: localhost
+  connection: local
+  gather_facts: true
+
+  vars:
+    # User variables
+    user: "{{ ansible_env.USER }}"
+
+    # Flatpak variables
+    flatpak_remote: "flathub"
+    flatpak_apps:
+      - io.github.lo2dev.Echo
+      - io.github.david_swift.Flashcards
+      - org.mozilla.firefox
+      - com.spotify.Client
+      - org.libreoffice.LibreOffice
+      - org.gimp.GIMP
+
+    # Logging variables
+    log_file: "/tmp/flatpak_install.log"
+
+  tasks:
+    # Ensure Flatpak is installed
+    - name: Ensure Flatpak is installed
+      become: true
+      apt:
+        name: flatpak
+        state: present
+      register: flatpak_install_result
+      failed_when: flatpak_install_result is failed
+      retries: 3
+      delay: 5
+
+    # Log Flatpak installation result
+    - name: Log Flatpak installation result
+      copy:
+        content: "Flatpak installation: {{ 'Success' if flatpak_install_result.changed else 'Already installed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Add Flathub repository
+    - name: Add Flathub repository
+      become: true
+      flatpak_remote:
+        name: "{{ flatpak_remote }}"
+        state: present
+        flatpakrepo_url: https://flathub.org/repo/flathub.flatpakrepo
+      register: flathub_add_result
+
+    # Log Flathub repository addition result
+    - name: Log Flathub repository addition result
+      copy:
+        content: "Flathub repository addition: {{ 'Success' if flathub_add_result.changed else 'Already added' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Prompt user for apps to install
+    - name: Prompt user for apps to install
+      pause:
+        prompt: |
+          Which Flatpak apps would you like to install? (Enter comma-separated numbers)
+          {% for app in flatpak_apps %}
+          {{ loop.index }}. {{ app }}
+          {% endfor %}
+      register: user_choice
+
+    # Parse user input
+    - name: Parse user input
+      set_fact:
+        selected_apps: "{{ user_choice.user_input.split(',') | map('trim') | map('int') | map('extract', flatpak_apps) | list }}"
+
+    # Install selected Flatpak apps
+    - name: Install selected Flatpak apps
+      become: true
+      flatpak:
+        name: "{{ item }}"
+        state: present
+        remote: "{{ flatpak_remote }}"
+      loop: "{{ selected_apps }}"
+      register: flatpak_app_install_result
+
+    # Log Flatpak app installation results
+    - name: Log Flatpak app installation results
+      copy:
+        content: |
+          Flatpak app installation results:
+          {% for result in flatpak_app_install_result.results %}
+          {{ result.item }}: {{ 'Success' if result.changed else 'Already installed' }}
+          {% endfor %}
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Update all installed Flatpak apps
+    - name: Update all installed Flatpak apps
+      become: true
+      command: flatpak update -y
+      register: flatpak_update_result
+      changed_when: "'Nothing to do.' not in flatpak_update_result.stdout"
+
+    # Log Flatpak update result
+    - name: Log Flatpak update result
+      copy:
+        content: "Flatpak apps update: {{ 'Updates applied' if flatpak_update_result.changed else 'No updates needed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Cleanup unused Flatpak runtimes
+    - name: Cleanup unused Flatpak runtimes
+      become: true
+      command: flatpak uninstall --unused -y
+      register: flatpak_cleanup_result
+      changed_when: flatpak_cleanup_result.stdout != ""
+
+    # Log Flatpak cleanup result
+    - name: Log Flatpak cleanup result
+      copy:
+        content: "Flatpak cleanup: {{ 'Unused runtimes removed' if flatpak_cleanup_result.changed else 'No cleanup needed' }}\n"
+        dest: "{{ log_file }}"
+        mode: "a"
+
+    # Display installation summary
+    - name: Display installation summary
+      debug:
+        msg: |
+          Installation Summary:
+          Flatpak: {{ 'Installed' if flatpak_install_result.changed else 'Already installed' }}
+          Flathub repository: {{ 'Added' if flathub_add_result.changed else 'Already present' }}
+          {% for result in flatpak_app_install_result.results %}
+          {{ result.item }}: {{ 'Installed' if result.changed else 'Already installed' }}
+          {% endfor %}
+          Flatpak apps update: {{ 'Updates applied' if flatpak_update_result.changed else 'No updates needed' }}
+          Flatpak cleanup: {{ 'Unused runtimes removed' if flatpak_cleanup_result.changed else 'No cleanup needed' }}
+
+    # Notify user about log file
+    - name: Notify user about log file
+      debug:
+        msg: "Detailed installation log can be found at {{ log_file }}"
+
+    # Final reminder to user
+    - name: Remind user about Flatpak app availability
+      debug:
+        msg: "The installed Flatpak apps are now available in your applications menu or can be run from the command line."
