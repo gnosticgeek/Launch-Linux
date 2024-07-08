@@ -7,6 +7,36 @@ from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QFont, QIcon
 
+# Catppuccin Latte color palette
+COLORS = {
+    'rosewater': '#dc8a78',
+    'flamingo': '#dd7878',
+    'pink': '#ea76cb',
+    'mauve': '#8839ef',
+    'red': '#d20f39',
+    'maroon': '#e64553',
+    'peach': '#fe640b',
+    'yellow': '#df8e1d',
+    'green': '#40a02b',
+    'teal': '#179299',
+    'sky': '#04a5e5',
+    'sapphire': '#209fb5',
+    'blue': '#1e66f5',
+    'lavender': '#7287fd',
+    'text': '#4c4f69',
+    'subtext1': '#5c5f77',
+    'subtext0': '#6c6f85',
+    'overlay2': '#7c7f93',
+    'overlay1': '#8c8fa1',
+    'overlay0': '#9ca0b0',
+    'surface2': '#acb0be',
+    'surface1': '#bcc0cc',
+    'surface0': '#ccd0da',
+    'base': '#eff1f5',
+    'mantle': '#e6e9ef',
+    'crust': '#dce0e8',
+}
+
 class DependencyInstaller(QThread):
     update_progress = pyqtSignal(int)
     update_status = pyqtSignal(str)
@@ -59,17 +89,17 @@ class LaunchGUI(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle("Launch - Linux Setup Assistant")
-        self.setGeometry(100, 100, 600, 400)
-        self.setStyleSheet("""
-            QMainWindow {
-                background-color: #f0f0f0;
-            }
-            QLabel {
-                color: #333333;
-            }
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
+        self.setGeometry(100, 100, 600, 500)
+        self.setStyleSheet(f"""
+            QMainWindow {{
+                background-color: {COLORS['base']};
+            }}
+            QLabel {{
+                color: {COLORS['text']};
+            }}
+            QPushButton {{
+                background-color: {COLORS['blue']};
+                color: {COLORS['base']};
                 border: none;
                 padding: 10px;
                 text-align: center;
@@ -77,22 +107,22 @@ class LaunchGUI(QMainWindow):
                 font-size: 16px;
                 margin: 4px 2px;
                 border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-            QPushButton:disabled {
-                background-color: #cccccc;
-                color: #666666;
-            }
-            QProgressBar {
-                border: 2px solid #4CAF50;
+            }}
+            QPushButton:hover {{
+                background-color: {COLORS['sapphire']};
+            }}
+            QPushButton:disabled {{
+                background-color: {COLORS['surface1']};
+                color: {COLORS['overlay1']};
+            }}
+            QProgressBar {{
+                border: 2px solid {COLORS['blue']};
                 border-radius: 5px;
                 text-align: center;
-            }
-            QProgressBar::chunk {
-                background-color: #4CAF50;
-            }
+            }}
+            QProgressBar::chunk {{
+                background-color: {COLORS['blue']};
+            }}
         """)
 
         main_layout = QVBoxLayout()
@@ -100,13 +130,24 @@ class LaunchGUI(QMainWindow):
         # Title
         self.title_label = QLabel("Welcome to Launch!")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.title_label.setStyleSheet("font-size: 24px; font-weight: bold; margin: 20px 0;")
+        self.title_label.setStyleSheet(f"font-size: 24px; font-weight: bold; margin: 20px 0; color: {COLORS['mauve']};")
         main_layout.addWidget(self.title_label)
+
+        # Description
+        self.description_label = QLabel(
+            "Launch is your friendly Linux setup assistant. We'll guide you through "
+            "the process of setting up your system with essential tools and "
+            "optimized configurations, making your Linux experience smooth and enjoyable."
+        )
+        self.description_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.description_label.setWordWrap(True)
+        self.description_label.setStyleSheet(f"font-size: 14px; margin: 10px 20px; color: {COLORS['subtext0']};")
+        main_layout.addWidget(self.description_label)
 
         # Status
         self.status_label = QLabel("Ready to install dependencies.")
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.status_label.setStyleSheet("font-size: 18px; margin-bottom: 10px;")
+        self.status_label.setStyleSheet(f"font-size: 18px; margin-bottom: 10px; color: {COLORS['text']};")
         main_layout.addWidget(self.status_label)
 
         # Progress Bar
@@ -118,7 +159,7 @@ class LaunchGUI(QMainWindow):
         # Detailed Status
         self.detail_label = QLabel("")
         self.detail_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.detail_label.setStyleSheet("font-size: 14px; color: #666666; margin-top: 10px;")
+        self.detail_label.setStyleSheet(f"font-size: 14px; color: {COLORS['subtext1']}; margin-top: 10px;")
         self.detail_label.setWordWrap(True)
         main_layout.addWidget(self.detail_label)
 
