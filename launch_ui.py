@@ -3,7 +3,7 @@ import subprocess
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QPushButton, QLabel, QProgressBar, QInputDialog,
                              QLineEdit, QMessageBox, QHBoxLayout, QSpacerItem,
-                             QSizePolicy, QComboBox, QFrame)
+                             QSizePolicy, QComboBox, QFrame, QStyle)
 from PyQt6.QtCore import QThread, pyqtSignal, Qt
 from PyQt6.QtGui import QIcon, QPainter, QColor
 
@@ -142,11 +142,11 @@ class LaunchGUI(QMainWindow):
         button_layout = QHBoxLayout()
         button_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
 
-        self.back_button = self.create_button("Back", self.go_back, 'path/to/back_icon.png')
+        self.back_button = self.create_button("Back", self.go_back, "back")
         self.back_button.setEnabled(False)
         button_layout.addWidget(self.back_button)
 
-        self.next_button = self.create_button("Next", self.go_next, 'path/to/next_icon.png')
+        self.next_button = self.create_button("Next", self.go_next, "forward")
         button_layout.addWidget(self.next_button)
 
         button_layout.addItem(QSpacerItem(40, 20, QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum))
@@ -174,11 +174,28 @@ class LaunchGUI(QMainWindow):
             label.setWordWrap(True)
         return label
 
-    def create_button(self, text, callback, icon_path):
+    def create_button(self, text, callback, icon_name):
         button = QPushButton(text)
         button.clicked.connect(callback)
-        button.setIcon(QIcon(icon_path))
+        icon = self.get_icon(icon_name)
+        if icon:
+            button.setIcon(icon)
         return button
+
+    def get_icon(self, name):
+        icon_map = {
+            "back": QStyle.StandardPixmap.SP_ArrowBack,
+            "forward": QStyle.StandardPixmap.SP_ArrowForward,
+            "down": QStyle.StandardPixmap.SP_ArrowDown,
+            "up": QStyle.StandardPixmap.SP_ArrowUp,
+            "info": QStyle.StandardPixmap.SP_FileDialogInfoView,
+            "apply": QStyle.StandardPixmap.SP_DialogApplyButton,
+            "cancel": QStyle.StandardPixmap.SP_DialogCancelButton,
+            "help": QStyle.StandardPixmap.SP_DialogHelpButton
+        }
+        if name in icon_map:
+            return self.style().standardIcon(icon_map[name])
+        return None
 
     def update_theme(self):
         self.setStyleSheet(self.themes[self.current_theme].get_stylesheet())
@@ -211,19 +228,23 @@ class LaunchGUI(QMainWindow):
         self.stepper.set_current_step(self.current_step)
         self.back_button.setEnabled(self.current_step > 0)
         self.next_button.setEnabled(self.current_step < len(self.steps) - 1)
-        
+
         if self.current_step == 0:
             self.status_label.setText("Welcome to Launch!")
             self.detail_label.setText("Click 'Next' to begin the setup process.")
+            self.next_button.setIcon(self.get_icon("forward"))
         elif self.current_step == 1:
             self.status_label.setText("Ready to install dependencies.")
             self.detail_label.setText("Click 'Next' to start the installation.")
+            self.next_button.setIcon(self.get_icon("down"))
         elif self.current_step == 2:
             self.status_label.setText("Configuration")
             self.detail_label.setText("Configure your system settings.")
+            self.next_button.setIcon(self.get_icon("info"))
         elif self.current_step == 3:
             self.status_label.setText("Setup Complete!")
             self.detail_label.setText("Your system is now set up and ready to use.")
+            self.next_button.setIcon(self.get_icon("apply"))
 
     def start_installation(self):
         password, ok = QInputDialog.getText(self, 'Sudo Password',
